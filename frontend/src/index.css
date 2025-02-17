@@ -1,0 +1,12 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+@layer base {
+    :root {
+      --color-brown-600: 107, 66, 38;
+      --color-brown-700: 139, 94, 52;
+    }
+  }
+  
+  
