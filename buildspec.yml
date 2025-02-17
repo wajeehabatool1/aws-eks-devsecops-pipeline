@@ -12,8 +12,12 @@ phases:
       nodejs: 18
     commands:
       - echo "Installing dependencies"
-      - curl -sSL https://github.com/zricethezav/gitleaks/releases/latest/download/gitleaks-linux-amd64 -o /usr/local/bin/gitleaks
+      - GITLEAKS_VERSION="8.18.1"
+      - wget "https://github.com/zricethezav/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+      - tar -xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+      - mv gitleaks /usr/local/bin/
       - chmod +x /usr/local/bin/gitleaks
+      - rm "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
       - npm install -g snyk
 
   pre_build:
