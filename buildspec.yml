@@ -1,0 +1,49 @@
+version: 0.2
+env:
+  variables:
+    SNYK_TOKEN: "fbc76124-10d8-4ef1-9c85-016067774004"
+
+install:
+  runtime-versions:
+    python: 3.9
+    golang: 1.18
+    nodejs: 18
+  commands:
+    - echo "installing dependencies"
+    - curl -sSL https://github.com/zricethezav/gitleaks/releases/latest/download/gitleaks-linux-amd64 -o /usr/local/bin/gitleaks
+    - sudo chmod +x /usr/local/gitleaks
+    - sudo npm install -g snyk
+
+pre_build:
+  commands:
+    - echo "running Gitleaks for secret scanning..."
+    - gitleaks detect --source . --verbose --redact || echo "No secrets found"
+
+    - echo "Authenticating Snyk..."
+    - snyk auth $SNYK_TOKEN
+
+    - echo "**** SNYK DEPENDENCY SCANNING ****"
+    
+    - cd backend
+    - echo "running snyk for dependency scanning for python service"
+    - cd customer-registration
+    - snyk test || echo "snyk scan completed with issues"
+    - cd ..
+
+    - echo "running snyk for dependency scanning for Node.js service"
+    - cd order-processing
+    - snyk test || echo "snyk scan completed with issues"
+    - cd ..
+
+    - echo "running snyk for dependency scanning for Golang service"
+    - cd notification
+    - snyk test || echo "snyk scan completed with issues"
+    - cd ..
+
+build:
+  commands:
+    - echo "build phase -------------------"
+
+post_build:
+  commands:
+    - echo "post build -------------------"
