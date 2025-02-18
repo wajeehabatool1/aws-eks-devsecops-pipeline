@@ -19,6 +19,9 @@ phases:
       - chmod +x /usr/local/bin/gitleaks
       - rm "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
       - npm install -g snyk
+      - echo "installing hadolint"
+      - wget -O /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
+      - chmod +x /usr/local/bin/hadolint
 
   pre_build:
     commands:
@@ -39,7 +42,19 @@ phases:
       - echo "Running snyk for dependency scanning for Golang service"
       - cd notification
       - snyk test || echo "Golang service snyk scan completed with issues"
-      - cd ../..
+      - cd ..
+
+      - echo "*******************Hadolint Running now ***********************"
+      - echo"scanning python service Docker file"
+      - hadolint customer-registration/Dockerfile || echo "Hadolint warnings for Python service"
+
+      - echo"scanning nodejs service Docker file"
+      - hadolint order-processing/Dockerfile || echo "Hadolint warnings for node.js service"
+
+      - echo"scanning Golang service Docker file"
+      - hadolint notification/Dockerfile || echo "Hadolint warnings for node.js service"
+
+      
 
   build:
     commands:
