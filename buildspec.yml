@@ -45,13 +45,13 @@ phases:
       - cd ..
 
       - echo "*******************Hadolint Running now ***********************"
-      - echo"scanning python service Docker file"
+      - echo "scanning python service Docker file"
       - hadolint customer-registration/Dockerfile || echo "Hadolint warnings for Python service"
 
-      - echo"scanning nodejs service Docker file"
+      - echo "scanning nodejs service Docker file"
       - hadolint order-processing/Dockerfile || echo "Hadolint warnings for node.js service"
 
-      - echo"scanning Golang service Docker file"
+      - echo "scanning Golang service Docker file"
       - hadolint notification/Dockerfile || echo "Hadolint warnings for node.js service"
 
       
