@@ -3,6 +3,12 @@ version: 0.2
 env:
   variables:
     SNYK_TOKEN: "fbc76124-10d8-4ef1-9c85-016067774004"
+    AWS_ACCOUNT_ID: "339712865909"
+    AWS_DEFAULT_REGION: "ap-south-1"
+    IMAGE_REPO_NAME: "devsecops"
+    IMAGE_TAG: "latest"
+    CONTAINER_NAME: "nodejs-app-container"
+    S3_BUCKET_NAME: "image-definition-bucket"
 
 phases:
   install:
@@ -25,6 +31,12 @@ phases:
 
   pre_build:
     commands:
+
+      - echo "Logging to AWS ECR ---------------"
+      - aws --version
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+                                                           `
       - echo "Running Gitleaks for secret scanning..."
       - gitleaks detect --source . --verbose --redact || echo "No secrets found"
       - echo "Authenticating Snyk..."
@@ -55,11 +67,29 @@ phases:
       - hadolint notification/Dockerfile  && echo "No issues found in Golang Dockerfile" || echo "Hadolint warnings for node.js service"
 
       
+      
+      
+      
 
   build:
     commands:
       - echo "Build phase -------------------"
-      # Add your build commands here
+      - echo "************* Building Docker Image ***************"
+      - echo "Building Customer Registraion Docker Image "
+      - cd customer-registration
+      - docker build -t customer_service:$IMAGE_TAG
+      - cd ..
+
+      - echo "Building Order Processing Docker Image "
+      - cd order-processing
+      - docker build -t order_service:$IMAGE_TAG
+      - cd ..
+
+      - echo "Building Notification Docker Image "
+      - cd notification
+      - docker build -t notification_service:$IMAGE_TAG
+      - cd ..
+
 
   post_build:
     commands:
