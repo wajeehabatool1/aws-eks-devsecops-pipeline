@@ -46,13 +46,13 @@ phases:
 
       - echo "*******************Hadolint Running now ***********************"
       - echo "scanning python service Docker file"
-      - hadolint customer-registration/Dockerfile || echo "Hadolint warnings for Python service"
+      - hadolint customer-registration/Dockerfile && echo "No issues found in Python Dockerfile" || echo "Hadolint warnings for Python service"
 
       - echo "scanning nodejs service Docker file"
-      - hadolint order-processing/Dockerfile || echo "Hadolint warnings for node.js service"
+      - hadolint order-processing/Dockerfile && echo "No issues found in Node.js Dockerfile" || echo "Hadolint warnings for node.js service"
 
       - echo "scanning Golang service Docker file"
-      - hadolint notification/Dockerfile || echo "Hadolint warnings for node.js service"
+      - hadolint notification/Dockerfile  && echo "No issues found in Golang Dockerfile" || echo "Hadolint warnings for node.js service"
 
       
 
