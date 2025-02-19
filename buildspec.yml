@@ -25,73 +25,102 @@ phases:
       - chmod +x /usr/local/bin/gitleaks
       - rm "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
       - npm install -g snyk
-      - echo "installing hadolint"
+      - echo "Installing Hadolint"
       - wget -O /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
       - chmod +x /usr/local/bin/hadolint
+      - echo "Installing Trivy"
+      - VERSION=$(wget -qO- https://api.github.com/repos/aquasecurity/trivy/releases/latest | grep '"tag_name":' | awk -F '"' '{print $4}')
+      - wget -O trivy.tar.gz "https://github.com/aquasecurity/trivy/releases/download/$VERSION/trivy_${VERSION#v}_Linux-64bit.tar.gz"
+      - tar -xzf trivy.tar.gz
+      - mv trivy /usr/local/bin/
+      - rm trivy.tar.gz
+      - trivy --version
 
   pre_build:
     commands:
-
-      - echo "Logging to AWS ECR ---------------"
+      - echo "Logging into AWS ECR"
       - aws --version
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
-                                                           `
+      - REPOSITORY_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME"
+
       - echo "Running Gitleaks for secret scanning..."
       - gitleaks detect --source . --verbose --redact || echo "No secrets found"
+
       - echo "Authenticating Snyk..."
       - snyk auth $SNYK_TOKEN
       - echo "**** SNYK DEPENDENCY SCANNING ****"
       - cd backend
-      - echo "Running snyk for dependency scanning for python service"
+
+      - echo "Running Snyk for Python service"
       - cd customer-registration
-      - snyk test || echo "python service snyk scan completed with issues"
-      - cd ..
-      - echo "Running snyk for dependency scanning for Node.js service"
-      - cd order-processing
-      - snyk test || echo "Node.js service snyk scan completed with issues"
-      - cd ..
-      - echo "Running snyk for dependency scanning for Golang service"
-      - cd notification
-      - snyk test || echo "Golang service snyk scan completed with issues"
+      - snyk test || echo "Python service Snyk scan completed with issues"
       - cd ..
 
-      - echo "*******************Hadolint Running now ***********************"
-      - echo "scanning python service Docker file"
+      - echo "Running Snyk for Node.js service"
+      - cd order-processing
+      - snyk test || echo "Node.js service Snyk scan completed with issues"
+      - cd ..
+
+      - echo "Running Snyk for Golang service"
+      - cd notification
+      - snyk test || echo "Golang service Snyk scan completed with issues"
+      - cd ..
+
+      - echo "******************* Running Hadolint ***********************"
+      - echo "Scanning Python service Dockerfile"
       - hadolint customer-registration/Dockerfile && echo "No issues found in Python Dockerfile" || echo "Hadolint warnings for Python service"
 
-      - echo "scanning nodejs service Docker file"
-      - hadolint order-processing/Dockerfile && echo "No issues found in Node.js Dockerfile" || echo "Hadolint warnings for node.js service"
+      - echo "Scanning Node.js service Dockerfile"
+      - hadolint order-processing/Dockerfile && echo "No issues found in Node.js Dockerfile" || echo "Hadolint warnings for Node.js service"
 
-      - echo "scanning Golang service Docker file"
-      - hadolint notification/Dockerfile  && echo "No issues found in Golang Dockerfile" || echo "Hadolint warnings for node.js service"
-
-      
-      
-      
-      
+      - echo "Scanning Golang service Dockerfile"
+      - hadolint notification/Dockerfile && echo "No issues found in Golang Dockerfile" || echo "Hadolint warnings for Golang service"
 
   build:
     commands:
-      - echo "Build phase -------------------"
-      - echo "************* Building Docker Image ***************"
-      - echo "Building Customer Registraion Docker Image "
+      - echo "************* Building Docker Images ***************"
+
+      - echo "Building Customer Registration Docker Image"
       - cd customer-registration
-      - docker build -t customer_service:$IMAGE_TAG
+      - docker build -t $IMAGE_REPO_NAME/customer_service:$IMAGE_TAG .
       - cd ..
 
-      - echo "Building Order Processing Docker Image "
+      - echo "Building Order Processing Docker Image"
       - cd order-processing
-      - docker build -t order_service:$IMAGE_TAG
+      - docker build -t $IMAGE_REPO_NAME/order_service:$IMAGE_TAG .
       - cd ..
 
-      - echo "Building Notification Docker Image "
+      - echo "Building Notification Docker Image"
       - cd notification
-      - docker build -t notification_service:$IMAGE_TAG
+      - docker build -t $IMAGE_REPO_NAME/notification_service:$IMAGE_TAG .
       - cd ..
-
 
   post_build:
     commands:
-      - echo "Post build -------------------"
-      # Add your post-build commands here
+      - echo "************ Post Build Phase ************"
+
+      - echo "Scanning Docker Images with Trivy"
+      - echo "Scanning Customer Image"
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL $IMAGE_REPO_NAME/customer_service:$IMAGE_TAG || echo "Customer Image Trivy scan completed with issues"
+      - echo "Scanning Order Image"
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL $IMAGE_REPO_NAME/order_service:$IMAGE_TAG || echo "Order Image Trivy scan completed with issues"
+      - echo "Scanning Notification Image"
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL $IMAGE_REPO_NAME/notification_service:$IMAGE_TAG || echo "Notification Image Trivy scan completed with issues"
+
+      - echo "Trivy Scan Completed"
+
+      - echo "************* Tagging and Pushing Images to AWS ECR *************"
+
+      - echo "Tagging and Pushing Customer Registration Image"
+      - docker tag $IMAGE_REPO_NAME/customer_service:$IMAGE_TAG $REPOSITORY_URI/customer_service:$IMAGE_TAG
+      - docker push $REPOSITORY_URI/customer_service:$IMAGE_TAG
+
+      - echo "Tagging and Pushing Order Processing Image"
+      - docker tag $IMAGE_REPO_NAME/order_service:$IMAGE_TAG $REPOSITORY_URI/order_service:$IMAGE_TAG
+      - docker push $REPOSITORY_URI/order_service:$IMAGE_TAG
+
+      - echo "Tagging and Pushing Notification Image"
+      - docker tag $IMAGE_REPO_NAME/notification_service:$IMAGE_TAG $REPOSITORY_URI/notification_service:$IMAGE_TAG
+      - docker push $REPOSITORY_URI/notification_service:$IMAGE_TAG
+
+      - echo "All Images Successfully Pushed to AWS ECR!"
