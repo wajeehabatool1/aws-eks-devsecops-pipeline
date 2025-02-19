@@ -10,6 +10,10 @@ env:
     CONTAINER_NAME: "nodejs-app-container"
     S3_BUCKET_NAME: "image-definition-bucket"
 
+    CUSTOMER_SERVICE_REPO: "339712865909.dkr.ecr.ap-south-1.amazonaws.com/customer_service"
+    ORDER_SERVICE_REPO: "339712865909.dkr.ecr.ap-south-1.amazonaws.com/order_service"
+    NOTIFICATION_SERVICE_REPO: "339712865909.dkr.ecr.ap-south-1.amazonaws.com/notification_service"
+
 phases:
   install:
     runtime-versions:
@@ -82,17 +86,17 @@ phases:
 
       - echo "Building Customer Registration Docker Image"
       - cd customer-registration
-      - docker build -t $IMAGE_REPO_NAME/customer_service:$IMAGE_TAG .
+      - docker build -t $CUSTOMER_SERVICE_REPO:$IMAGE_TAG .
       - cd ..
 
       - echo "Building Order Processing Docker Image"
       - cd order-processing
-      - docker build -t $IMAGE_REPO_NAME/order_service:$IMAGE_TAG .
+      - docker build -t $ORDER_SERVICE_REPO:$IMAGE_TAG .
       - cd ..
 
       - echo "Building Notification Docker Image"
       - cd notification
-      - docker build -t $IMAGE_REPO_NAME/notification_service:$IMAGE_TAG .
+      - docker build -t $NOTIFICATION_SERVICE_REPO:$IMAGE_TAG .
       - cd ..
 
   post_build:
@@ -101,26 +105,19 @@ phases:
 
       - echo "Scanning Docker Images with Trivy"
       - echo "Scanning Customer Image"
-      - trivy image --exit-code 0 --severity HIGH,CRITICAL $IMAGE_REPO_NAME/customer_service:$IMAGE_TAG || echo "Customer Image Trivy scan completed with issues"
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL $CUSTOMER_SERVICE_REPO:$IMAGE_TAG || echo "Customer Image Trivy scan completed with issues"
       - echo "Scanning Order Image"
-      - trivy image --exit-code 0 --severity HIGH,CRITICAL $IMAGE_REPO_NAME/order_service:$IMAGE_TAG || echo "Order Image Trivy scan completed with issues"
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL $ORDER_SERVICE_REPO:$IMAGE_TAG || echo "Order Image Trivy scan completed with issues"
       - echo "Scanning Notification Image"
-      - trivy image --exit-code 0 --severity HIGH,CRITICAL $IMAGE_REPO_NAME/notification_service:$IMAGE_TAG || echo "Notification Image Trivy scan completed with issues"
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL $NOTIFICATION_SERVICE_REPO:$IMAGE_TAG || echo "Notification Image Trivy scan completed with issues"
 
       - echo "Trivy Scan Completed"
 
       - echo "************* Tagging and Pushing Images to AWS ECR *************"
 
-      - echo "Tagging and Pushing Customer Registration Image"
-      - docker tag $IMAGE_REPO_NAME/customer_service:$IMAGE_TAG $REPOSITORY_URI/customer_service:$IMAGE_TAG
-      - docker push $REPOSITORY_URI/customer_service:$IMAGE_TAG
+      - docker push $CUSTOMER_SERVICE_REPO:$IMAGE_TAG
+      - docker push $ORDER_SERVICE_REPO:$IMAGE_TAG
+      - docker push $NOTIFICATION_SERVICE_REPO:$IMAGE_TAG
 
-      - echo "Tagging and Pushing Order Processing Image"
-      - docker tag $IMAGE_REPO_NAME/order_service:$IMAGE_TAG $REPOSITORY_URI/order_service:$IMAGE_TAG
-      - docker push $REPOSITORY_URI/order_service:$IMAGE_TAG
-
-      - echo "Tagging and Pushing Notification Image"
-      - docker tag $IMAGE_REPO_NAME/notification_service:$IMAGE_TAG $REPOSITORY_URI/notification_service:$IMAGE_TAG
-      - docker push $REPOSITORY_URI/notification_service:$IMAGE_TAG
-
+      
       - echo "All Images Successfully Pushed to AWS ECR!"
