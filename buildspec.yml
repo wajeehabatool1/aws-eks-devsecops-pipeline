@@ -9,6 +9,7 @@ env:
     IMAGE_TAG: "latest"
     CONTAINER_NAME: "nodejs-app-container"
     S3_BUCKET_NAME: "image-definition-bucket"
+    prowlerS3Bucket : "prowler-aws-report-bucket"
 
     CUSTOMER_SERVICE_REPO: "339712865909.dkr.ecr.ap-south-1.amazonaws.com/customer_service"
     ORDER_SERVICE_REPO: "339712865909.dkr.ecr.ap-south-1.amazonaws.com/order_service"
@@ -39,6 +40,10 @@ phases:
       - mv trivy /usr/local/bin/
       - rm trivy.tar.gz
       - trivy --version
+
+      - echo "installing Prowler"
+      - curl -LO https://github.com/prowler-cloud/prowler/releases/latest/download/prowler-linux-amd64
+      - chmod +x prowler-linux-amd64
 
   pre_build:
     commands:
@@ -79,6 +84,9 @@ phases:
 
       - echo "Scanning Golang service Dockerfile"
       - hadolint notification/Dockerfile && echo "No issues found in Golang Dockerfile" || echo "Hadolint warnings for Golang service"
+
+      - echo "Running Prowler AWS Security Scan ..."
+      - prowler -r $AWS_DEFAULT_REGION -M json -o prowler-report.json
 
   build:
     commands:
@@ -121,3 +129,10 @@ phases:
 
       
       - echo "All Images Successfully Pushed to AWS ECR!"
+
+      - echo "Uploading Prowler  Report to S3"
+      - aws s3 cp prowler-report.json s3://$prowlerS3Bucket/prowler-report.json
+
+      - echo "Sending Reports to AWS Security Hub"
+      - prowler -r $AWS_DEFAULT_REGION -M json-asff | aws securityhub batch-import-findings --region $AWS_DEFAULT_REGION --findings file://prowler-report.json
+
