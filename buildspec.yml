@@ -129,6 +129,6 @@ phases:
       - echo "All Images Successfully Pushed to AWS ECR!"  | tee -a $REPORT_FILE
 
       # Upload the report to S3 with versioning
-    - echo "Uploading CodeBuild Report to S3" | tee -a $REPORT_FILE
-    - aws s3 cp $REPORT_FILE s3://$S3_BUCKET_NAME/reports/$REPORT_FILE --region $AWS_DEFAULT_REGION | tee -a $REPORT_FILE
-    - echo "CodeBuild Report uploaded to S3!" 
+      - echo "Uploading CodeBuild Report to S3" | tee -a $REPORT_FILE
+      - aws s3 cp $REPORT_FILE s3://$S3_BUCKET_NAME/reports/$REPORT_FILE --region $AWS_DEFAULT_REGION | tee -a $REPORT_FILE
+      - echo "CodeBuild Report uploaded to S3!" 
