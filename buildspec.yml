@@ -39,14 +39,14 @@ phases:
       - mv trivy /usr/local/bin/
       - rm trivy.tar.gz
       - trivy --version
-
-  pre_build:
-    commands:
-      - echo "Running pre-build phase"
       - |
         function send_slack {
           curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"$1\"}" $SLACK_WEBHOOK_URL
         }
+
+  pre_build:
+    commands:
+      - echo "Running pre-build phase"
       - echo "Logging into AWS ECR"
       - aws --version
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
