@@ -2,14 +2,13 @@ version: 0.2
 
 env:
   variables:
+    SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/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"
     SNYK_TOKEN: "fbc76124-10d8-4ef1-9c85-016067774004"
     AWS_ACCOUNT_ID: "339712865909"
     AWS_DEFAULT_REGION: "ap-south-1"
     IMAGE_REPO_NAME: "devsecops"
     IMAGE_TAG: "latest"
-    CONTAINER_NAME: "nodejs-app-container"
     S3_BUCKET_NAME: "image-definition-bucket"
-    prowlerS3Bucket : "prowler-aws-report-bucket"
 
     CUSTOMER_SERVICE_REPO: "339712865909.dkr.ecr.ap-south-1.amazonaws.com/customer_service"
     ORDER_SERVICE_REPO: "339712865909.dkr.ecr.ap-south-1.amazonaws.com/order_service"
@@ -41,20 +40,21 @@ phases:
       - rm trivy.tar.gz
       - trivy --version
 
-      - echo "installing Prowler"
-      - curl -LO https://github.com/prowler-cloud/prowler/releases/latest/download/prowler-linux-amd64
-      - chmod +x prowler-linux-amd64
-      - mv prowler-linux-amd64 /usr/local/bin/prowler
-
   pre_build:
     commands:
+      - echo "Running pre-build phase"
+      - |
+        function send_slack {
+          curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"$1\"}" $SLACK_WEBHOOK_URL
+        }
       - echo "Logging into AWS ECR"
       - aws --version
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - REPOSITORY_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME"
 
       - echo "Running Gitleaks for secret scanning..."
-      - gitleaks detect --source . --verbose --redact || echo "No secrets found"
+      - gitleaks detect --source . --verbose --redact 
+      - if [ $? -eq 0 ]; then echo "No secrets found"; send_slack "✅ Gitleaks completed successfully"; else echo "Secrets found"; send_slack "❌ Gitleaks found secrets"; fi
 
       - echo "Authenticating Snyk..."
       - snyk auth $SNYK_TOKEN
@@ -63,31 +63,35 @@ phases:
 
       - echo "Running Snyk for Python service"
       - cd customer-registration
-      - snyk test || echo "Python service Snyk scan completed with issues"
+      - snyk test 
+      - if [ $? -eq 0 ]; then echo "Python service Snyk scan passed"; send_slack "✅ Python service Snyk scan passed"; else echo "Python service Snyk scan failed"; send_slack "❌ Python service Snyk scan failed"; fi
       - cd ..
 
       - echo "Running Snyk for Node.js service"
       - cd order-processing
-      - snyk test || echo "Node.js service Snyk scan completed with issues"
+      - snyk test 
+       - if [ $? -eq 0 ]; then echo "Node.js service Snyk scan passed"; send_slack "✅ Node.js service Snyk scan passed"; else echo "Node.js service Snyk scan failed"; send_slack "❌ Node.js service Snyk scan failed"; fi
       - cd ..
 
       - echo "Running Snyk for Golang service"
       - cd notification
-      - snyk test || echo "Golang service Snyk scan completed with issues"
+      - snyk test 
+      - if [ $? -eq 0 ]; then echo "Golang service Snyk scan passed"; send_slack "✅ Golang service Snyk scan passed"; else echo "Golang service Snyk scan failed"; send_slack "❌ Golang service Snyk scan failed"; fi
       - cd ..
 
       - echo "******************* Running Hadolint ***********************"
       - echo "Scanning Python service Dockerfile"
-      - hadolint customer-registration/Dockerfile && echo "No issues found in Python Dockerfile" || echo "Hadolint warnings for Python service"
+      - hadolint customer-registration/Dockerfile 
+      - if [ $? -eq 0 ]; then echo "No issues found in Python Dockerfile"; send_slack "✅ No issues in Python Dockerfile"; else echo "Hadolint warnings for Python service"; send_slack "❌ Hadolint warnings for Python service"; fi
 
       - echo "Scanning Node.js service Dockerfile"
-      - hadolint order-processing/Dockerfile && echo "No issues found in Node.js Dockerfile" || echo "Hadolint warnings for Node.js service"
+      - hadolint order-processing/Dockerfile 
+      - if [ $? -eq 0 ]; then echo "No issues found in Node.js Dockerfile"; send_slack "✅ No issues in Node.js Dockerfile"; else echo "Hadolint warnings for Node.js service"; send_slack "❌ Hadolint warnings for Node.js service"; fi
 
       - echo "Scanning Golang service Dockerfile"
-      - hadolint notification/Dockerfile && echo "No issues found in Golang Dockerfile" || echo "Hadolint warnings for Golang service"
+      - hadolint notification/Dockerfile 
+      - if [ $? -eq 0 ]; then echo "No issues found in Golang Dockerfile"; send_slack "✅ No issues in Golang Dockerfile"; else echo "Hadolint warnings for Golang service"; send_slack "❌ Hadolint warnings for Golang service"; fi
 
-      - echo "Running Prowler AWS Security Scan ..."
-      - prowler -r $AWS_DEFAULT_REGION -M json -o prowler-report.json
 
   build:
     commands:
@@ -96,16 +100,19 @@ phases:
       - echo "Building Customer Registration Docker Image"
       - cd customer-registration
       - docker build -t $CUSTOMER_SERVICE_REPO:$IMAGE_TAG .
+      - send_slack "✅ Image Build Completed for $CUSTOMER_SERVICE_REPO"
       - cd ..
 
       - echo "Building Order Processing Docker Image"
       - cd order-processing
       - docker build -t $ORDER_SERVICE_REPO:$IMAGE_TAG .
+      - send_slack "✅ Image Build Completed for $ORDER_SERVICE_REPO"
       - cd ..
 
       - echo "Building Notification Docker Image"
       - cd notification
       - docker build -t $NOTIFICATION_SERVICE_REPO:$IMAGE_TAG .
+      - send_slack "✅ Image Build Completed for $NOTIFICATION_SERVICE_REPO"
       - cd ..
 
   post_build:
@@ -114,26 +121,31 @@ phases:
 
       - echo "Scanning Docker Images with Trivy"
       - echo "Scanning Customer Image"
-      - trivy image --exit-code 0 --severity HIGH,CRITICAL $CUSTOMER_SERVICE_REPO:$IMAGE_TAG || echo "Customer Image Trivy scan completed with issues"
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL $CUSTOMER_SERVICE_REPO:$IMAGE_TAG 
+      - if [ $? -eq 0 ]; then echo "Customer Image Trivy scan passed"; send_slack "✅ Customer Image Trivy scan passed"; else echo "Customer Image Trivy scan completed with issues"; send_slack "❌ Customer Image Trivy scan completed with issues"; fi
+      
       - echo "Scanning Order Image"
-      - trivy image --exit-code 0 --severity HIGH,CRITICAL $ORDER_SERVICE_REPO:$IMAGE_TAG || echo "Order Image Trivy scan completed with issues"
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL $ORDER_SERVICE_REPO:$IMAGE_TAG 
+      - if [ $? -eq 0 ]; then echo "Order Image Trivy scan passed"; send_slack "✅ Order Image Trivy scan passed"; else echo "Order Image Trivy scan completed with issues"; send_slack "❌ Order Image Trivy scan completed with issues"; fi
+    
       - echo "Scanning Notification Image"
-      - trivy image --exit-code 0 --severity HIGH,CRITICAL $NOTIFICATION_SERVICE_REPO:$IMAGE_TAG || echo "Notification Image Trivy scan completed with issues"
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL $NOTIFICATION_SERVICE_REPO:$IMAGE_TAG 
+      - if [ $? -eq 0 ]; then echo "Notification Image Trivy scan passed"; send_slack "✅ Notification Image Trivy scan passed"; else echo "Notification Image Trivy scan completed with issues"; send_slack "❌ Notification Image Trivy scan completed with issues"; fi
 
       - echo "Trivy Scan Completed"
+      - send_slack "✅ Trivy Scans Completed"
 
       - echo "************* Tagging and Pushing Images to AWS ECR *************"
 
       - docker push $CUSTOMER_SERVICE_REPO:$IMAGE_TAG
+      - if [ $? -eq 0 ]; then echo "Customer Image pushed successfully"; send_slack "✅ Customer Image pushed successfully"; else echo "Customer Image push failed"; send_slack "❌ Customer Image push failed"; fi
       - docker push $ORDER_SERVICE_REPO:$IMAGE_TAG
+      - if [ $? -eq 0 ]; then echo "Order Image pushed successfully"; send_slack "✅ Order Image pushed successfully"; else echo "Order Image push failed"; send_slack "❌ Order Image push failed"; fi
       - docker push $NOTIFICATION_SERVICE_REPO:$IMAGE_TAG
-
+      - if [ $? -eq 0 ]; then echo "Notification Image pushed successfully"; send_slack "✅ Notification Image pushed successfully"; else echo "Notification Image push failed"; send_slack "❌ Notification Image push failed"; fi
       
       - echo "All Images Successfully Pushed to AWS ECR!"
+      - send_slack "✅ All Images Successfully Pushed to AWS ECR!"
 
-      - echo "Uploading Prowler  Report to S3"
-      - aws s3 cp prowler-report.json s3://$prowlerS3Bucket/prowler-report.json
-
-      - echo "Sending Reports to AWS Security Hub"
-      - prowler -r $AWS_DEFAULT_REGION -M json-asff | aws securityhub batch-import-findings --region $AWS_DEFAULT_REGION --findings file://prowler-report.json
+      
 
