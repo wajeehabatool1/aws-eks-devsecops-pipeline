@@ -14,12 +14,6 @@ env:
     ORDER_SERVICE_REPO: "339712865909.dkr.ecr.ap-south-1.amazonaws.com/order_service"
     NOTIFICATION_SERVICE_REPO: "339712865909.dkr.ecr.ap-south-1.amazonaws.com/notification_service"
 
-functions:
-  send_slack: |
-    function send_slack {
-      curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"$1\"}" $SLACK_WEBHOOK_URL
-    }
-
 phases:
   install:
     runtime-versions:
@@ -27,6 +21,10 @@ phases:
       golang: 1.18
       nodejs: 18
     commands:
+      - |
+        function send_slack() {
+          curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"$1\"}" $SLACK_WEBHOOK_URL
+        }
       - echo "Installing dependencies"
       - GITLEAKS_VERSION="8.18.1"
       - wget "https://github.com/zricethezav/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
