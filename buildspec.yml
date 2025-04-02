@@ -61,7 +61,7 @@ phases:
 
       - echo "Running Snyk for Python service" | tee -a $REPORT_FILE
       - cd customer-registration
-      - snyk test snyk test 2>&1 | tee -a $REPORT_FILE || echo "Python service Snyk scan completed with issues" | tee -a $REPORT_FILE
+      - snyk test 2>&1 | tee -a $REPORT_FILE || echo "Python service Snyk scan completed with issues" | tee -a $REPORT_FILE
       - cd ..
 
       - echo "Running Snyk for Node.js service" | tee -a $REPORT_FIL
