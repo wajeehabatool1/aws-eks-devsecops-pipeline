@@ -2,7 +2,7 @@ version: 0.2
 
 env:
   variables:
-    SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/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"
+    SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/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"
     SNYK_TOKEN: "fbc76124-10d8-4ef1-9c85-016067774004"
     AWS_ACCOUNT_ID: "339712865909"
     AWS_DEFAULT_REGION: "ap-south-1"
@@ -45,6 +45,10 @@ phases:
       - trivy --version
   pre_build:
     commands:
+      - |
+        send_slack() {
+          curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"$1\"}" $SLACK_WEBHOOK_URL
+        }
       - echo "Running pre-build phase"
       - echo "Logging into AWS ECR"
       - aws --version
@@ -94,6 +98,10 @@ phases:
 
   build:
     commands:
+      - |
+        send_slack() {
+          curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"$1\"}" $SLACK_WEBHOOK_URL
+        }
       - echo "************* Building Docker Images ***************"
 
       - echo "Building Customer Registration Docker Image"
@@ -116,6 +124,10 @@ phases:
 
   post_build:
     commands:
+      - |
+        send_slack() {
+          curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"$1\"}" $SLACK_WEBHOOK_URL
+        }
       - echo "************ Post Build Phase ************"
 
       - echo "Scanning Docker Images with Trivy"
