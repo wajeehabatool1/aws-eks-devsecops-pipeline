@@ -8,8 +8,9 @@ env:
     IMAGE_REPO_NAME: "devsecops"
     IMAGE_TAG: "latest"
     CONTAINER_NAME: "nodejs-app-container"
-    S3_BUCKET_NAME: "image-definition-bucket"
-    
+    S3_BUCKET_NAME: "aws-codebuild-report"
+    REPORT_FILE: "codebuild_report.txt"
+
 
     CUSTOMER_SERVICE_REPO: "339712865909.dkr.ecr.ap-south-1.amazonaws.com/customer_service"
     ORDER_SERVICE_REPO: "339712865909.dkr.ecr.ap-south-1.amazonaws.com/order_service"
@@ -22,14 +23,14 @@ phases:
       golang: 1.18
       nodejs: 18
     commands:
-      - echo "Installing dependencies"
+      - echo "Installing dependencies" | tee -a $REPORT_FILE
       - GITLEAKS_VERSION="8.18.1"
-      - wget "https://github.com/zricethezav/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+      - wget "https://github.com/zricethezav/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"  | tee -a $REPORT_FILE
       - tar -xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
       - mv gitleaks /usr/local/bin/
       - chmod +x /usr/local/bin/gitleaks
       - rm "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-      - npm install -g snyk
+      - npm install -g snyk  | tee -a $REPORT_FILE
       - echo "Installing Hadolint"
       - wget -O /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
       - chmod +x /usr/local/bin/hadolint
@@ -39,92 +40,95 @@ phases:
       - tar -xzf trivy.tar.gz
       - mv trivy /usr/local/bin/
       - rm trivy.tar.gz
-      - trivy --version
+      - trivy --version | tee -a $REPORT_FILE
 
       
 
   pre_build:
     commands:
-      - echo "Logging into AWS ECR"
+      - echo "Logging into AWS ECR"  | tee -a $REPORT_FILE
       - aws --version
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com | tee -a $REPORT_FILE
       - REPOSITORY_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME"
 
-      - echo "Running Gitleaks for secret scanning..."
-      - gitleaks detect --source . --verbose --redact || echo "No secrets found"
+      - echo "Running Gitleaks for secret scanning..." | tee -a $REPORT_FILE 
+      - gitleaks detect --source . --verbose --redact || echo " secrets found" | tee -a $REPORT_FILE
 
-      - echo "Authenticating Snyk..."
-      - snyk auth $SNYK_TOKEN
-      - echo "**** SNYK DEPENDENCY SCANNING ****"
+      - echo "Authenticating Snyk..." | tee -a $REPORT_FILE 
+      - snyk auth $SNYK_TOKEN | tee -a $REPORT_FILE
+      - echo "**** SNYK DEPENDENCY SCANNING ****" | tee -a $REPORT_FILE
       - cd backend
 
-      - echo "Running Snyk for Python service"
+      - echo "Running Snyk for Python service" | tee -a $REPORT_FILE
       - cd customer-registration
-      - snyk test || echo "Python service Snyk scan completed with issues"
+      - snyk test || echo "Python service Snyk scan completed with issues" | tee -a $REPORT_FILE
       - cd ..
 
-      - echo "Running Snyk for Node.js service"
+      - echo "Running Snyk for Node.js service" | tee -a $REPORT_FILE
       - cd order-processing
-      - snyk test || echo "Node.js service Snyk scan completed with issues"
+      - snyk test || echo "Node.js service Snyk scan completed with issues" | tee -a $REPORT_FILE
       - cd ..
 
-      - echo "Running Snyk for Golang service"
+      - echo "Running Snyk for Golang service" | tee -a $REPORT_FILE
       - cd notification
-      - snyk test || echo "Golang service Snyk scan completed with issues"
+      - snyk test || echo "Golang service Snyk scan completed with issues" | tee -a $REPORT_FILE
       - cd ..
 
-      - echo "******************* Running Hadolint ***********************"
-      - echo "Scanning Python service Dockerfile"
-      - hadolint customer-registration/Dockerfile && echo "No issues found in Python Dockerfile" || echo "Hadolint warnings for Python service"
+      - echo "******************* Running Hadolint ***********************" | tee -a $REPORT_FILE
+      - echo "Scanning Python service Dockerfile" | tee -a $REPORT_FILE
+      - hadolint customer-registration/Dockerfile && echo "No issues found in Python Dockerfile" || echo "Hadolint warnings for Python service" | tee -a $REPORT_FILE
 
       - echo "Scanning Node.js service Dockerfile"
-      - hadolint order-processing/Dockerfile && echo "No issues found in Node.js Dockerfile" || echo "Hadolint warnings for Node.js service"
+      - hadolint order-processing/Dockerfile && echo "No issues found in Node.js Dockerfile" || echo "Hadolint warnings for Node.js service" | tee -a $REPORT_FILE
 
       - echo "Scanning Golang service Dockerfile"
-      - hadolint notification/Dockerfile && echo "No issues found in Golang Dockerfile" || echo "Hadolint warnings for Golang service"
+      - hadolint notification/Dockerfile && echo "No issues found in Golang Dockerfile" || echo "Hadolint warnings for Golang service" | tee -a $REPORT_FILE
 
       
 
   build:
     commands:
-      - echo "************* Building Docker Images ***************"
+      - echo "************* Building Docker Images ***************" | tee -a $REPORT_FILE
 
-      - echo "Building Customer Registration Docker Image"
+      - echo "Building Customer Registration Docker Image" | tee -a $REPORT_FILE
       - cd customer-registration
       - docker build -t $CUSTOMER_SERVICE_REPO:$IMAGE_TAG .
       - cd ..
 
-      - echo "Building Order Processing Docker Image"
+      - echo "Building Order Processing Docker Image" | tee -a $REPORT_FILE
       - cd order-processing
       - docker build -t $ORDER_SERVICE_REPO:$IMAGE_TAG .
       - cd ..
 
-      - echo "Building Notification Docker Image"
+      - echo "Building Notification Docker Image" | tee -a $REPORT_FILE
       - cd notification
       - docker build -t $NOTIFICATION_SERVICE_REPO:$IMAGE_TAG .
       - cd ..
 
   post_build:
     commands:
-      - echo "************ Post Build Phase ************"
+      - echo "************ Post Build Phase ************" | tee -a $REPORT_FILE
 
-      - echo "Scanning Docker Images with Trivy"
-      - echo "Scanning Customer Image"
-      - trivy image --exit-code 0 --severity HIGH,CRITICAL $CUSTOMER_SERVICE_REPO:$IMAGE_TAG || echo "Customer Image Trivy scan completed with issues"
-      - echo "Scanning Order Image"
-      - trivy image --exit-code 0 --severity HIGH,CRITICAL $ORDER_SERVICE_REPO:$IMAGE_TAG || echo "Order Image Trivy scan completed with issues"
-      - echo "Scanning Notification Image"
-      - trivy image --exit-code 0 --severity HIGH,CRITICAL $NOTIFICATION_SERVICE_REPO:$IMAGE_TAG || echo "Notification Image Trivy scan completed with issues"
+      - echo "Scanning Docker Images with Trivy" | tee -a $REPORT_FILE
+      - echo "Scanning Customer Image" | tee -a $REPORT_FILE
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL $CUSTOMER_SERVICE_REPO:$IMAGE_TAG || echo "Customer Image Trivy scan completed with issues" | tee -a $REPORT_FILE
+      - echo "Scanning Order Image" | tee -a $REPORT_FILE
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL $ORDER_SERVICE_REPO:$IMAGE_TAG || echo "Order Image Trivy scan completed with issues" | tee -a $REPORT_FILE
+      - echo "Scanning Notification Image" | tee -a $REPORT_FILE
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL $NOTIFICATION_SERVICE_REPO:$IMAGE_TAG || echo "Notification Image Trivy scan completed with issues" | tee -a $REPORT_FILE
 
-      - echo "Trivy Scan Completed"
+      - echo "Trivy Scan Completed" | tee -a $REPORT_FILE
 
-      - echo "************* Tagging and Pushing Images to AWS ECR *************"
+      - echo "************* Tagging and Pushing Images to AWS ECR *************" | tee -a $REPORT_FILE
 
-      - docker push $CUSTOMER_SERVICE_REPO:$IMAGE_TAG
+      - docker push $CUSTOMER_SERVICE_REPO:$IMAGE_TAG 
       - docker push $ORDER_SERVICE_REPO:$IMAGE_TAG
       - docker push $NOTIFICATION_SERVICE_REPO:$IMAGE_TAG
 
       
-      - echo "All Images Successfully Pushed to AWS ECR!"
+      - echo "All Images Successfully Pushed to AWS ECR!"  | tee -a $REPORT_FILE
 
-      
+      # Upload the report to S3 with versioning
+    - echo "Uploading CodeBuild Report to S3" | tee -a $REPORT_FILE
+    - aws s3 cp $REPORT_FILE s3://$S3_BUCKET_NAME/reports/$REPORT_FILE --region $AWS_DEFAULT_REGION | tee -a $REPORT_FILE
+    - echo "CodeBuild Report uploaded to S3!" 
