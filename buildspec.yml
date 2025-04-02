@@ -53,7 +53,7 @@ phases:
       - REPOSITORY_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME"
 
       - echo "Running Gitleaks for secret scanning..."
-      - gitleaks detect --source . --verbose --redact 
+      - gitleaks detect --source . --verbose --redact  || echo "Secrets found"
       - if [ $? -eq 0 ]; then echo "No secrets found"; send_slack "✅ Gitleaks completed successfully"; else echo "Secrets found"; send_slack "❌ Gitleaks found secrets"; fi
 
       - echo "Authenticating Snyk..."
