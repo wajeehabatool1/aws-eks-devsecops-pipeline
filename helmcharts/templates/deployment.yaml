@@ -1,0 +1,39 @@
+{{- range $serviceName, $service := .Values.services }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $service.name }}-deployment
+  namespace: {{ $.Values.global.namespace }}
+spec:
+  replicas: {{ $service.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $service.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $service.name }}
+    spec:
+      containers:
+        - name: {{ $service.name }}
+          image: {{ $service.image }}
+          ports:
+            - containerPort: {{ $service.port }}
+          env:
+            {{- range $key, $value := $service.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- if eq $service.name "mongodb" }}
+          volumeMounts:
+            - name: {{ $service.volumeName }}
+              mountPath: {{ $service.mountPath }}
+          {{- end }}
+      {{- if eq $service.name "mongodb" }}
+      volumes: 
+        - name: {{ $service.volumeName }}
+          persistentVolumeClaim:
+            claimName: {{ $service.claimName }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,68 @@
+global:
+  namespace: default
+
+services:
+  frontend:
+    replicas: 1
+    name: frontend
+    image: wajeeha835/brewandblissfrontend:v0
+    port: 3000
+    env: 
+      REACT_APP_CUSTOMER_SERVICE_URL: "http://35.238.227.236/register"
+      REACT_APP_ORDER_SERVICE_URL: "http://35.238.227.236/order"
+    targetPort: 3000
+  
+  customer:
+    replicas: 1
+    name: customer
+    image: wajeeha835/customerservice:v0
+    port: 8000
+    env:
+      MONGODB_URI: "mongodb://mongodb-service:27017"
+      DB_NAME: "coffeshop" 
+      HOST: "0.0.0.0"
+      PORT: "8000"  
+    targetPort: 8000
+  
+  order:
+    replicas: 1
+    name: order
+    image: wajeeha835/orderservice:v4
+    port: 8080
+    env:
+      MONGO_URI: "mongodb://mongodb-service:27017"
+      DB_NAME: "coffee_tracker"
+      CUSTOMER_SERVICE_URL: "http://customer-service:8000"
+      QUEUE_SERVICE_URL: "http://notification-service:9000"
+      ORDER_SERVICE_PORT: "8080"  
+    targetPort: 8080
+  
+  notification:
+    replicas: 1
+    name: notification
+    image: wajeeha835/notificationservice:v0
+    port: 9000
+    env:
+      EMAIL: "f219119@cfd.nu.edu.pk"
+      EMAIL_PASSWO: "vjnh iwpx bokx timh"
+      SMTP_HOST: "smtp.gmail.com"
+      SMTP_PORT: "587"
+      PORT: "9000"  
+    targetPort: 9000
+
+  mongodb:
+    replicas: 1
+    name: mongodb
+    image: mongo:latest
+    port: 27017  
+    volumeName: mongodb-storage
+    mountPath: /data/db
+    claimName: mongodb-pvc
+    targetPort: 27017
+
+volumeClaim:  
+  name: mongodb-pvc
+  label: mongodb
+  accessModes: ReadWriteOnce
+  storageRequest: 1Gi
+  storageClassName: standard
